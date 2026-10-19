@@ -1,0 +1,12 @@
+# Named non-secret connections, referenced by tools.yaml connection_name.
+# connections:
+#   country_connection:
+#     connector: {category: RDBMS, type: SNOWFLAKE}
+#     configuration:
+#       account: example-account
+#       warehouse: example-warehouse
+#       database: example-database
+#       schema: example-schema
+#       user: example-service-user
+# Credentials remain in environment variables or the secrets manager.
+connections: {}

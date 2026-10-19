@@ -1,0 +1,239 @@
+graph:
+  graph_id: customer_feedback_response_workflow
+  description: Validate, classify, route, and respond to customer feedback.
+  entry_node: prepare_feedback
+  end_nodes:
+    - finalize_output
+  final_output_field: final_response
+
+  nodes:
+    - node_id: prepare_feedback
+      node_type: deterministic
+      agent_name: null
+      operation_type: input_validation
+      execution_mode: null
+      description: Validate and normalize incoming customer feedback.
+      reads_state:
+        - user_input
+      writes_state:
+        - normalized_feedback
+        - validation_status
+        - errors
+      metadata:
+        parameters:
+          required: true
+          min_length: 4
+
+    - node_id: classify_sentiment
+      node_type: agent
+      agent_name: sentiment_classifier
+      operation_type: null
+      execution_mode: null
+      description: Classify feedback sentiment and confidence.
+      reads_state:
+        - normalized_feedback
+      writes_state:
+        - sentiment
+        - confidence
+        - sentiment_reason
+      metadata: {}
+
+    - node_id: evaluate_feedback
+      node_type: deterministic
+      agent_name: null
+      operation_type: feedback_scoring
+      execution_mode: null
+      description: Calculate deterministic urgency and policy-risk scores.
+      reads_state:
+        - normalized_feedback
+        - sentiment
+        - confidence
+      writes_state:
+        - urgency_score
+        - policy_risk_score
+      metadata:
+        parameters:
+          score_range:
+            minimum: 0
+            maximum: 100
+
+    - node_id: appreciation_response
+      node_type: agent
+      agent_name: appreciation_responder
+      operation_type: null
+      execution_mode: null
+      description: Produce an appreciation response.
+      reads_state:
+        - normalized_feedback
+        - sentiment_reason
+      writes_state:
+        - final_response
+      metadata: {}
+
+    - node_id: clarification_response
+      node_type: agent
+      agent_name: clarification_responder
+      operation_type: null
+      execution_mode: null
+      description: Generate a focused clarification question for unclear feedback.
+      reads_state:
+        - normalized_feedback
+        - sentiment
+        - confidence
+      writes_state:
+        - clarification_question
+      metadata: {}
+
+    - node_id: request_clarification
+      node_type: deterministic
+      agent_name: null
+      operation_type: clarification_interrupt
+      execution_mode: null
+      description: Pause for clarification and add the answer to the feedback context.
+      reads_state:
+        - normalized_feedback
+        - clarification_question
+      writes_state:
+        - normalized_feedback
+        - clarification_question
+      metadata:
+        parameters:
+          resume_required: true
+
+    - node_id: service_recovery_response
+      node_type: agent
+      agent_name: service_recovery_responder
+      operation_type: null
+      execution_mode: null
+      description: Draft an empathetic service-recovery response.
+      reads_state:
+        - normalized_feedback
+        - sentiment_reason
+        - urgency_score
+      writes_state:
+        - draft_response
+      metadata: {}
+
+    - node_id: policy_guidance
+      node_type: agent
+      agent_name: policy_advisor
+      operation_type: null
+      execution_mode: null
+      description: Apply policy guidance to the response.
+      reads_state:
+        - normalized_feedback
+        - draft_response
+        - policy_risk_score
+      writes_state:
+        - policy_guidance
+        - final_response
+      metadata: {}
+
+    - node_id: human_review
+      node_type: deterministic
+      agent_name: null
+      operation_type: human_review_interrupt
+      execution_mode: null
+      description: Pause high-risk feedback for an approved response.
+      reads_state:
+        - normalized_feedback
+        - sentiment
+        - urgency_score
+        - policy_risk_score
+      writes_state:
+        - human_decision
+        - final_response
+      metadata:
+        parameters:
+          resume_required: true
+
+    - node_id: finalize_output
+      node_type: deterministic
+      agent_name: null
+      operation_type: response_formatting
+      execution_mode: null
+      description: Produce the final public response from response or error state.
+      reads_state:
+        - errors
+        - final_response
+      writes_state:
+        - final_response
+      metadata: {}
+
+  edges:
+    - source: classify_sentiment
+      target: evaluate_feedback
+      description: Pass sentiment analysis to deterministic evaluation.
+    - source: appreciation_response
+      target: finalize_output
+      description: Format the appreciation response.
+    - source: clarification_response
+      target: request_clarification
+      description: Ask the generated clarification question.
+    - source: request_clarification
+      target: classify_sentiment
+      description: Reclassify feedback with the customer's clarification.
+    - source: service_recovery_response
+      target: policy_guidance
+      description: Apply policy guidance to the recovery response.
+    - source: policy_guidance
+      target: finalize_output
+      description: Format the policy-aware response.
+    - source: human_review
+      target: finalize_output
+      description: Format the approved high-risk response.
+  conditional_edges:
+    - source: prepare_feedback
+      decision_field: validation_status
+      description: Route according to input validation.
+      routes:
+        - route_key: valid
+          target: classify_sentiment
+          description: Continue with valid feedback.
+        - route_key: invalid
+          target: finalize_output
+          description: Return the validation error.
+    - source: evaluate_feedback
+      router: evaluate_feedback
+      description: Route according to sentiment and risk scores.
+      routes:
+        - route_key: appreciation
+          target: appreciation_response
+          description: Generate an appreciation response.
+        - route_key: clarification
+          target: clarification_response
+          description: Request clarification before responding.
+        - route_key: service_recovery
+          target: service_recovery_response
+          description: Start service recovery.
+        - route_key: human_review
+          target: human_review
+          description: Request approval for a high-risk response.
+
+persistence:
+  enabled: true
+  backend: memory
+
+execution:
+  save_output: false
+  resume_enabled: true
+
+runtime_context:
+  defaults: {}
+
+tracing:
+  workflow:
+    enabled: true
+    name: Customer Feedback Response Workflow
+    run_type: chain
+    tags:
+      - workflow
+      - langgraph
+    metadata:
+      workflow_name: customer_feedback_response
+      workflow_version: "1.0"
+    input_fields:
+      flow_run_id: flow_run_id
+      user_input: inputs.user_input
+    output_fields:
+      final_response: final_response

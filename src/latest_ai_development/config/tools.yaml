@@ -1,0 +1,11 @@
+# Tool behavior and factory references only; named connections live in connection.yml.
+# tools:
+#   Country Lookup:
+#     factory: latest_ai_development.tools.snowflake_connector:create_tool
+#     connection_name: country_connection
+#     description: Retrieve country reference data.
+#     purpose: Metadata retrieval and country queries.
+#     usage_guidelines: [Use only the configured country table.]
+#     non_usage_guidelines: [Do not modify data.]
+# Assign the exact tool key in agents.yaml tools; multiple tools may share a connection.
+tools: {}

@@ -1,0 +1,10 @@
+# MCP server definitions are kept separate from ordinary Python tool factories.
+# Credentials must be supplied through environment variables or a secrets manager.
+# Example:
+# servers:
+#   catalog:
+#     transport: streamable_http
+#     url: https://mcp.example.com/mcp
+#     headers:
+#       Authorization: ${MCP_CATALOG_AUTHORIZATION}
+servers: {}
